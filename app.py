@@ -3,24 +3,27 @@ from ultralytics import YOLO
 from PIL import Image
 import numpy as np
 import pandas as pd
+import io
 
-# Konfiguration
+# --- KONFIGURATION ---
 st.set_page_config(
-    page_title="JKI Crop & Pest Detector",
-    page_icon="🌱",
+    page_title="JKI Crop & Pest Analyzer Pro",
+    page_icon="🔬",
     layout="wide"
 )
 
-# Custom CSS für JKI-Branding
+# Custom CSS für einen professionellen "Lab-Look"
 st.markdown("""
     <style>
-    .main { background-color: #f9fbf9; }
-    [data-testid="stSidebar"] { background-color: #f0f4f0; }
-    .stMetric { background-color: #ffffff; border: 1px solid #e1e4e8; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
+    .main { background-color: #f4f7f4; }
+    [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e1e4e8; }
+    .stMetric { border: 1px solid #c8d6c8; padding: 15px; border-radius: 12px; background-color: #ffffff; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+    .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
+    .report-header { font-size: 24px; font-weight: bold; color: #2e4d2e; border-bottom: 2px solid #2e4d2e; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# Mapping-Dictionary für die deutschen Übersetzungen
+# --- DATEN-MAPPING ---
 DEUTSCHE_NAMEN = {
     "Adulto": "Erwachsenes Tier",
     "Black-grass-caterpillar": "Schwarze Graseule (Raupe)",
@@ -51,73 +54,105 @@ DEUTSCHE_NAMEN = {
     "Citricola scale": "Zitrus-Schildlaus"
 }
 
-# Modell laden
+# --- MODELL LADEN ---
 @st.cache_resource
 def load_model():
-    return YOLO("best.pt")
+    m = YOLO("best.pt")
+    # Namen im Modell direkt für das Plotten auf Deutsch mappen
+    new_names = {id: DEUTSCHE_NAMEN.get(name.strip(), name.strip()) for id, name in m.names.items()}
+    m.names = new_names
+    return m
 
 model = load_model()
 
-# --- SIDEBAR ---
+# --- SIDEBAR: KONTROLLZENTRUM ---
 with st.sidebar:
-    st.image("https://www.julius-kuehn.de/fileadmin/templates/jki/img/jki_logo.png", width=120)
-    st.header("Analyse & Befunde")
+    st.image("https://www.julius-kuehn.de/fileadmin/templates/jki/img/jki_logo.png", width=180)
+    st.header("🔬 Analyse-Parameter")
     
-    conf_threshold = st.slider("KI-Konfidenz", 0.0, 1.0, 0.25, 0.05, 
-                               help="Schwellenwert für die Erkennungssicherheit.")
+    conf_threshold = st.slider("Sensitivität (Confidence)", 0.0, 1.0, 0.25, 0.05)
+    show_labels = st.checkbox("Labels im Bild anzeigen", value=True)
+    show_boxes = st.checkbox("Bounding Boxes anzeigen", value=True)
     
     st.divider()
-    
-    # Platzhalter für Befunde in der Sidebar
-    sidebar_results_placeholder = st.container()
+    st.subheader("📊 Zusammenfassung")
+    stats_container = st.container()
 
 # --- HAUPTBEREICH ---
-st.title("🌱 JKI Prototyp: Crop & Weed Detector")
-st.markdown("#### KI-gestützte Schaderreger-Diagnostik")
+st.title("🌱 JKI Crop & Pest Analyzer Pro")
+st.markdown("Automatisierte Identifikation von Schaderregern für den digitalen Pflanzenschutz.")
 
-uploaded_file = st.file_uploader("Pflanzenfoto zur Analyse hochladen...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Bild zur Analyse hochladen (Hochauflösende Feldaufnahmen bevorzugt)", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    with st.spinner('Bild wird analysiert...'):
-        image = Image.open(uploaded_file)
-        
-        # Inferenz
+    # Analyse
+    image = Image.open(uploaded_file)
+    with st.spinner('KI führt Präzisionsanalyse durch...'):
         results = model.predict(image, conf=conf_threshold)
-        res_plotted = results[0].plot()
         
-        # Anzeige der Bilder im Hauptbereich
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(image, caption="Originalaufnahme", use_container_width=True)
-        with col2:
-            st.image(res_plotted, caption="Visualisierte Erkennung", use_container_width=True)
+        # Bildgenerierung
+        res_plotted = results[0].plot(labels=show_labels, boxes=show_boxes)
+        
+        # UI Spalten
+        col_img1, col_img2 = st.columns(2)
+        with col_img1:
+            st.image(image, caption="Original-Input", use_container_width=True)
+        with col_img2:
+            st.image(res_plotted, caption="KI-Befund (Annotiert)", use_container_width=True)
 
-        # Daten für die Sidebar aufbereiten
-        detections = results[0].boxes.cls.tolist()
-        names = model.names
-        found_any = False
+    st.divider()
+
+    # --- DATEN-AUSWERTUNG ---
+    boxes = results[0].boxes
+    if len(boxes) > 0:
+        # Erstelle DataFrame für die Analyse
+        df_list = []
+        for box in boxes:
+            class_id = int(box.cls[0])
+            name = model.names[class_id]
+            confidence = float(box.conf[0])
+            df_list.append({"Objekt": name, "Sicherheit": confidence})
         
-        with sidebar_results_placeholder:
-            st.subheader("Aktuelle Befunde")
-            for idx, name in names.items():
-                count = detections.count(idx)
-                if count > 0:
-                    found_any = True
-                    name_de = DEUTSCHE_NAMEN.get(name, name)
-                    # Kompakte Anzeige in der Sidebar
-                    st.metric(label=name_de, value=int(count))
+        df = pd.DataFrame(df_list)
+        
+        # Bereich 1: Detaillierte Tabelle
+        st.markdown('<div class="report-header">Detaillierter Befundbericht</div>', unsafe_allow_html=True)
+        
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            st.dataframe(df.style.format({"Sicherheit": "{:.2%}"}), use_container_width=True, hide_index=True)
+        
+        with c2:
+            # Export-Funktion
+            st.write("### 📥 Daten-Export")
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Befund als CSV speichern",
+                data=csv,
+                file_name="jki_analyse_bericht.csv",
+                mime="text/csv"
+            )
             
-            if not found_any:
-                st.warning("Keine Schädlinge erkannt.")
-            else:
-                st.success(f"{len(detections)} Objekte identifiziert.")
+            # Durchschnittliche Konfidenz als Qualitätssiegel
+            avg_conf = df["Sicherheit"].mean()
+            st.metric("Ø Analyse-Sicherheit", f"{avg_conf:.1%}")
+
+        # Sidebar-Update mit Metriken
+        with stats_container:
+            counts = df["Objekt"].value_counts()
+            for obj_name, count in counts.items():
+                st.metric(label=obj_name, value=int(count))
+            st.info(f"Insgesamt {len(df)} Detektionen.")
+
+    else:
+        st.warning("Keine Schaderreger mit der aktuellen Sensitivität gefunden. Passen Sie den Regler in der Sidebar an.")
 
 else:
-    st.info("Bitte laden Sie ein Foto hoch, um die Analyse zu starten.")
+    # Home Screen
+    st.info("System bereit. Bitte Bildmaterial zur Analyse einspeisen.")
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Corn_field_in_summer_Germany.jpg/1200px-Corn_field_in_summer_Germany.jpg", 
-             caption="Überwachung landwirtschaftlicher Kulturen", 
-             use_container_width=True)
+             caption="Vorschau: Monitoring landwirtschaftlicher Nutzflächen", use_container_width=True)
 
 # Footer
 st.markdown("---")
-st.caption("Prototyp für das Julius Kühn-Institut (JKI) | Monitoring-System v1.2")
+st.caption("Digitale Diagnostik v1.5 PRO | Kontakt: JKI Fachbereich IT-Anwendungen")
