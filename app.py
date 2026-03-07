@@ -4,6 +4,7 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 import os
+import datetime
 
 # --- KONFIGURATION ---
 st.set_page_config(
@@ -12,17 +13,25 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS für JKI-Branding
+# Professionelles JKI-Branding CSS
 st.markdown("""
     <style>
-    .main { background-color: #f4f7f4; }
+    .main { background-color: #f8faf8; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e1e4e8; }
-    .stMetric { border: 1px solid #c8d6c8; padding: 15px; border-radius: 12px; background-color: #ffffff; }
-    .report-header { font-size: 24px; font-weight: bold; color: #2e4d2e; border-bottom: 2px solid #2e4d2e; margin-bottom: 20px; }
+    .stMetric { border: 1px solid #c8d6c8; padding: 15px; border-radius: 12px; background-color: #ffffff; box-shadow: 2px 2px 5px rgba(0,0,0,0.03); }
+    .report-card { 
+        background-color: #ffffff; 
+        padding: 20px; 
+        border-radius: 10px; 
+        border-left: 5px solid #2e4d2e;
+        margin-bottom: 20px;
+    }
+    .status-high { color: #d32f2f; font-weight: bold; }
+    .status-low { color: #2e7d32; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# Mapping-Dictionary für die deutschen Übersetzungen
+# Mapping-Dictionary (Deutsch)
 DEUTSCHE_NAMEN = {
     "Adulto": "Erwachsenes Tier",
     "Black-grass-caterpillar": "Schwarze Graseule (Raupe)",
@@ -53,85 +62,115 @@ DEUTSCHE_NAMEN = {
     "Citricola scale": "Zitrus-Schildlaus"
 }
 
-# --- MODELL LADEN MIT FEHLER-CHECK ---
 @st.cache_resource
 def load_model():
     model_path = "best.pt"
-    
-    # Check ob Datei existiert
     if not os.path.exists(model_path):
-        st.error(f"⚠️ Die Datei '{model_path}' wurde nicht gefunden! Bitte stellen Sie sicher, dass sie im Hauptverzeichnis liegt.")
-        return None, None
-    
+        return None
     try:
         m = YOLO(model_path)
-        # Deutsche Namen mappen
-        translated_names = {id: DEUTSCHE_NAMEN.get(name.strip(), name.strip()) for id, name in m.names.items()}
-        return m, translated_names
-    except Exception as e:
-        st.error(f"❌ Fehler beim Laden des Modells: {e}")
-        st.info("Hinweis: Wenn Sie GitHub nutzen, könnte Git LFS das Problem sein. Die Datei 'best.pt' muss als echte Datei vorliegen, nicht als Text-Pointer.")
-        return None, None
+        return m
+    except:
+        return None
 
-model, names_de = load_model()
+model = load_model()
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.image("https://www.julius-kuehn.de/fileadmin/templates/jki/img/jki_logo.png", width=180)
-    st.header("🔬 Parameter")
-    conf_threshold = st.slider("KI-Sensitivität", 0.0, 1.0, 0.25, 0.05)
+    st.header("⚙️ Analyse-Steuerung")
+    conf_threshold = st.slider("KI-Konfidenz (Sensitivität)", 0.1, 1.0, 0.25, 0.05)
     
     st.divider()
-    st.subheader("📊 Zusammenfassung")
-    stats_placeholder = st.container()
+    st.subheader("📊 Befund-Statistik")
+    sidebar_stats = st.container()
 
 # --- HAUPTBEREICH ---
 st.title("🌱 JKI Crop & Pest Analyzer Pro")
-st.markdown("Automatisierte Identifikation von Schaderregern | Julius Kühn-Institut")
+st.write(f"Datum der Untersuchung: {datetime.date.today().strftime('%d.%m.%Y')}")
 
-if model is not None:
-    uploaded_file = st.file_uploader("Pflanzenfoto hochladen...", type=["jpg", "jpeg", "png"])
+if model:
+    uploaded_file = st.file_uploader("Bild zur Schaderreger-Analyse hochladen...", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
         image = Image.open(uploaded_file)
-        with st.spinner('Analysiere Bildmaterial...'):
+        
+        with st.spinner('KI-Modell berechnet Befunde...'):
+            # Inferenz
             results = model.predict(image, conf=conf_threshold)
             
-            # Temporärer Patch für deutsche Labels im Plot
-            results[0].names = names_de 
-            res_plotted = results[0].plot()
+            # --- DER DEUTSCH-FIX ---
+            # Wir erzwingen die deutschen Namen im Plotting-Prozess
+            # Wir erstellen ein Mapping-Dict basierend auf den IDs des Modells
+            names_map = {id: DEUTSCHE_NAMEN.get(name, name) for id, name in model.names.items()}
+            results[0].names = names_map # Temporäres Überschreiben für das Bild
+            
+            res_plotted = results[0].plot(line_width=2, font_size=1)
             
             col1, col2 = st.columns(2)
             with col1:
-                st.image(image, caption="Originalaufnahme", use_container_width=True)
+                st.image(image, caption="Originale Feldaufnahme", use_container_width=True)
             with col2:
-                st.image(res_plotted, caption="Ergebnis mit deutschen Labels", use_container_width=True)
+                st.image(res_plotted, caption="Detektierte Schaderreger (DE)", use_container_width=True)
 
-        # Auswertung
+        # --- VERBESSERTER BERICHT ---
+        st.markdown("---")
+        st.subheader("📋 Digitaler Befundbericht")
+        
         boxes = results[0].boxes
         if len(boxes) > 0:
-            df = pd.DataFrame([
-                {"Objekt": names_de[int(box.cls[0])], "Sicherheit": float(box.conf[0])} 
-                for box in boxes
-            ])
+            # Daten sammeln
+            data = []
+            for box in boxes:
+                cls_id = int(box.cls[0])
+                name_de = names_map[cls_id]
+                conf = float(box.conf[0])
+                data.append({"Schaderreger": name_de, "Sicherheit": conf})
             
-            st.markdown('<div class="report-header">Analyse-Bericht</div>', unsafe_allow_html=True)
+            df = pd.DataFrame(data)
             
+            # Dashboard Layout
             c1, c2 = st.columns([2, 1])
+            
             with c1:
-                st.dataframe(df.style.format({"Sicherheit": "{:.2%}"}), use_container_width=True, hide_index=True)
+                st.markdown('<div class="report-card">', unsafe_allow_html=True)
+                st.write("**Identifizierte Populationen:**")
+                # Gruppierte Zusammenfassung
+                summary_df = df.groupby("Schaderreger").agg(
+                    Anzahl=("Schaderreger", "count"),
+                    Ø_Sicherheit=("Sicherheit", "mean")
+                ).reset_index()
+                
+                st.dataframe(summary_df.style.format({"Ø_Sicherheit": "{:.1%}"}), 
+                             use_container_width=True, hide_index=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
             with c2:
+                # Befallsschwere einschätzen
+                total_pests = len(df)
+                risk_status = "HOCH" if total_pests > 10 else "MODERAT" if total_pests > 3 else "GERING"
+                color_class = "status-high" if risk_status != "GERING" else "status-low"
+                
+                st.markdown(f"""
+                <div class="report-card">
+                    <p><strong>Befallsintensität:</strong></p>
+                    <h2 class="{color_class}">{risk_status}</h2>
+                    <p>Gesamtanzahl Funde: {total_pests}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # CSV Export
                 csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Bericht als CSV exportieren", csv, "jki_report.csv", "text/csv")
-                st.metric("Durchschnittliche Sicherheit", f"{df['Sicherheit'].mean():.1%}")
+                st.download_button("📥 Vollständigen Datensatz exportieren", csv, "jki_befund.csv", "text/csv")
 
-            with stats_placeholder:
-                for obj, count in df["Objekt"].value_counts().items():
-                    st.metric(label=obj, value=int(count))
+            # Sidebar Update
+            with sidebar_stats:
+                for _, row in summary_df.iterrows():
+                    st.metric(label=row["Schaderreger"], value=int(row["Anzahl"]))
         else:
-            st.warning("Keine Schädlinge im aktuellen Bild erkannt.")
+            st.info("Keine Schaderreger im Analysebereich gefunden.")
 else:
-    st.warning("Das System ist aufgrund eines Modellfehlers derzeit nicht einsatzbereit.")
+    st.error("Modell 'best.pt' fehlt. Bitte laden Sie die Modelldatei in das Hauptverzeichnis hoch.")
 
 st.markdown("---")
-st.caption("Forschungsprototyp | JKI Bewerbungsprojekt")
+st.caption("Forschungsprototyp | Julius Kühn-Institut (JKI) | Fachbereich Diagnostik")
