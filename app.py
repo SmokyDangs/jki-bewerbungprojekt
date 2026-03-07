@@ -13,27 +13,51 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- BRANDING & CSS ---
+# --- BRANDING & CSS (Adaptive Design) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    /* Global Font & Spacing */
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    .stApp { background-color: #f1f5f9; }
+    
+    /* Header Styling */
     .main-header {
         background: linear-gradient(90deg, #005432 0%, #007d4a 100%);
-        padding: 2rem;
-        border-radius: 15px;
+        padding: 1.5rem 2rem;
+        border-radius: 12px;
         color: white;
         margin-bottom: 2rem;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
+    
+    /* Adaptive Card Design für Light & Dark Mode */
     .res-card {
-        background: white;
         border-radius: 12px;
-        padding: 1.5rem;
-        border: 1px solid #e2e8f0;
+        padding: 1rem;
+        border: 1px solid rgba(128, 128, 128, 0.2);
         margin-bottom: 20px;
+        background-color: rgba(128, 128, 128, 0.05);
+        transition: transform 0.2s;
     }
+    .res-card:hover {
+        transform: translateY(-2px);
+        border-color: #007d4a;
+    }
+    
+    /* Custom Badge für Befunde */
+    .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: #007d4a;
+        color: white;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    
     .stImage > img { border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
@@ -57,31 +81,37 @@ DEUTSCHE_NAMEN = {
 
 @st.cache_resource
 def load_model():
-    model = YOLO("best.pt")
-    # Wir speichern die Übersetzung separat, um den AttributeError zu vermeiden
-    return model
+    # Placeholder für das echte Modell-Laden
+    try:
+        model = YOLO("best.pt")
+        return model
+    except:
+        st.error("Modell 'best.pt' nicht gefunden. Bitte stellen Sie sicher, dass die Datei im Verzeichnis liegt.")
+        return None
 
 model = load_model()
 
-# Hilfsfunktion für die Namen
 def get_label(cls_id):
-    eng_name = model.names[int(cls_id)]
-    return DEUTSCHE_NAMEN.get(eng_name, eng_name)
+    if model and hasattr(model, 'names'):
+        eng_name = model.names[int(cls_id)]
+        return DEUTSCHE_NAMEN.get(eng_name, eng_name)
+    return f"Klasse {cls_id}"
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.markdown("## 🔍 Agroscan AI")
-    st.caption("v2.4 Enterprise Edition")
+    st.image("https://www.julius-kuehn.de/fileadmin/templates/jki/img/jki_logo.png", width=150) # Beispiel Logo-Platzhalter
+    st.markdown("### 🔍 Agroscan AI")
+    st.caption("v2.5 Enterprise Edition")
     st.divider()
-    conf_threshold = st.slider("KI-Konfidenz (Sensitivität)", 0.0, 1.0, 0.25, 0.05)
+    conf_threshold = st.slider("KI-Sensitivität (Confidence)", 0.0, 1.0, 0.25, 0.05)
     st.divider()
     sidebar_stats = st.container()
 
 # --- HEADER ---
 st.markdown(f"""
     <div class="main-header">
-        <h1>🌿 JKI Agroscan AI Dashboard</h1>
-        <p>Batch-Diagnostik für den integrierten Pflanzenschutz</p>
+        <h1 style='margin:0; color:white;'>🌿 JKI Agroscan AI Dashboard</h1>
+        <p style='margin:0; opacity:0.8;'>Batch-Diagnostik für den integrierten Pflanzenschutz</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -90,51 +120,66 @@ tab1, tab2 = st.tabs(["🔍 Analyse & Monitoring", "📊 Analytics & Export"])
 with tab1:
     files = st.file_uploader("Bilddaten hochladen", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-    if files:
+    if files and model:
         all_results_data = []
         progress_bar = st.progress(0)
+        
+        # Grid-Layout für Ergebnisse
         cols = st.columns(3)
         
         for i, file in enumerate(files):
-            # 1. Bild laden
+            # Bild laden
             file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
             img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
             
-            # 2. Inferenz (YOLO Standard)
-            results = model.predict(img_bgr, conf=conf_threshold)
+            # Inferenz
+            results = model.predict(img_bgr, conf=conf_threshold, verbose=False)
             
-            # 3. Plotten & Statistik
             counts = {}
-            if results[0].boxes:
-                # Wir plotten das Bild
+            if len(results[0].boxes) > 0:
                 res_bgr = results[0].plot(line_width=2)
                 res_rgb = cv2.cvtColor(res_bgr, cv2.COLOR_BGR2RGB)
                 
                 detections = results[0].boxes.cls.tolist()
-                for cls_id in detections:
+                confs = results[0].boxes.conf.tolist()
+                
+                for cls_id, conf in zip(detections, confs):
                     name = get_label(cls_id)
-                    all_results_data.append({"Bild": file.name, "Fund": name, "Zeit": datetime.now().strftime("%H:%M:%S")})
+                    all_results_data.append({
+                        "Bild": file.name, 
+                        "Fund": name, 
+                        "Konfidenz": round(conf, 2),
+                        "Zeit": datetime.now().strftime("%H:%M:%S")
+                    })
                     counts[name] = counts.get(name, 0) + 1
             else:
                 res_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
+            # Darstellung in der Karte
             with cols[i % 3]:
                 st.markdown('<div class="res-card">', unsafe_allow_html=True)
                 st.image(res_rgb, use_container_width=True)
-                st.caption(f"📄 {file.name}")
+                st.caption(f"**Datei:** {file.name}")
+                
                 if counts:
+                    # Verbesserte Darstellung der Befunde
+                    html_badges = ""
                     for label, count in counts.items():
-                        st.markdown(f"**{count}x** :green[{label}]")
+                        html_badges += f'<span class="badge">{count}x {label}</span>'
+                    st.markdown(html_badges, unsafe_allow_html=True)
                 else:
-                    st.markdown(":gray[Keine Befunde]")
+                    st.markdown("<small style='color:gray;'>Keine Schädlinge erkannt</small>", unsafe_allow_html=True)
+                
                 st.markdown('</div>', unsafe_allow_html=True)
             
             progress_bar.progress((i + 1) / len(files))
         
         progress_bar.empty()
         st.session_state['analysis_data'] = all_results_data
+    elif not model:
+        st.warning("Das KI-Modell konnte nicht geladen werden.")
     else:
-        st.info("Bitte laden Sie Bilder hoch, um die Analyse zu starten.")
+        st.info("Bitte laden Sie Bilddaten hoch, um die automatisierte Analyse zu starten.")
 
 with tab2:
     if 'analysis_data' in st.session_state and st.session_state['analysis_data']:
@@ -142,20 +187,47 @@ with tab2:
         summary = df.groupby(['Fund']).size().reset_index(name='Anzahl')
         
         col_chart, col_data = st.columns([2, 1])
+        
         with col_chart:
-            fig = px.bar(summary, x='Fund', y='Anzahl', color='Anzahl', color_continuous_scale='Greens')
+            # Theme-bewusste Charts
+            fig = px.bar(
+                summary, 
+                x='Fund', 
+                y='Anzahl', 
+                color='Anzahl', 
+                color_continuous_scale='Greens',
+                template="plotly_dark" if st.get_option("theme.base") == "dark" else "plotly_white",
+                title="Häufigkeit der Befunde"
+            )
             st.plotly_chart(fig, use_container_width=True)
             
         with col_data:
+            st.subheader("Übersicht")
             csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 CSV Export", csv, "jki_report.csv", "text/csv", use_container_width=True)
+            st.download_button(
+                label="📥 CSV Report herunterladen",
+                data=csv,
+                file_name=f"JKI_Agroscan_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+            
             for _, row in summary.iterrows():
                 st.metric(label=row['Fund'], value=int(row['Anzahl']))
+        
+        st.divider()
+        st.subheader("Rohdaten")
+        st.dataframe(df, use_container_width=True)
                 
         with sidebar_stats:
             st.metric("Gesamtbefunde", len(df))
+            st.metric("Einzigartige Arten", len(summary))
     else:
-        st.warning("Noch keine Analysedaten verfügbar.")
+        st.warning("Noch keine Analysedaten verfügbar. Bitte führen Sie zuerst eine Analyse im ersten Tab durch.")
 
+# --- FOOTER ---
 st.markdown("---")
-st.markdown("<center><small>© 2026 JKI | Prototyp v2.4 | Fix: AttributeError & Multi-Detection</small></center>", unsafe_allow_html=True)
+st.markdown(
+    "<center><small style='opacity:0.6;'>© 2026 JKI | Pflanzenschutz-Diagnoseeinheit | Prototyp v2.5</small></center>", 
+    unsafe_allow_html=True
+)
