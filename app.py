@@ -12,45 +12,27 @@ st.set_page_config(
 )
 
 # --- BRANDING & CSS ---
-# JKI Farben: Dunkelgrün (~#005432), Hellgrün (~#86bc25)
 st.markdown("""
     <style>
-    /* Hintergrund und Schrift */
     .stApp { background-color: #f8fafc; }
-    h1, h2, h3 { color: #005432; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    
-    /* Sidebar Styling */
+    h1, h2, h3 { color: #005432; font-family: 'Segoe UI', sans-serif; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e2e8f0; }
+    div[data-testid="stMetricValue"] { font-size: 22px; color: #005432; font-weight: bold; }
     
-    /* Karten-Design für Metriken */
-    div[data-testid="stMetricValue"] { font-size: 24px; color: #005432; }
-    .metric-card {
-        background-color: #ffffff;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    .image-container {
         border: 1px solid #e2e8f0;
-        margin-bottom: 15px;
+        border-radius: 12px;
+        padding: 15px;
+        background-color: white;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     
-    /* Button Styling */
     .stButton>button {
         background-color: #005432;
         color: white;
         border-radius: 8px;
-        border: none;
-        padding: 0.5rem 1rem;
-        transition: all 0.3s;
-    }
-    .stButton>button:hover { background-color: #86bc25; border: none; color: white; }
-
-    /* Stil für die Bild-Container */
-    .image-container {
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 10px;
-        background-color: white;
-        margin-bottom: 20px;
+        width: 100%;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -89,6 +71,7 @@ DEUTSCHE_NAMEN = {
 @st.cache_resource
 def load_model():
     model = YOLO("best.pt")
+    # Mapping auf das interne Modell-Dictionary anwenden
     if hasattr(model, 'names'):
         for idx, eng_name in model.names.items():
             if eng_name in DEUTSCHE_NAMEN:
@@ -99,47 +82,43 @@ model = load_model()
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.title("🌿 JKI Agroscan")
-    st.subheader("🛠️ Analyse-Einstellungen")
+    st.markdown("## 🌿 JKI Agroscan")
+    st.divider()
+    st.subheader("🛠️ Einstellungen")
     
-    conf_threshold = st.slider("KI-Konfidenz (Sensitivität)", 0.0, 1.0, 0.25, 0.05,
-                               help="Bestimmt, wie sicher sich die KI sein muss, um einen Fund anzuzeigen.")
+    conf_threshold = st.slider("KI-Konfidenz (Sensitivität)", 0.0, 1.0, 0.25, 0.05)
     
     st.divider()
     st.markdown("### 📊 Live-Statistik")
     sidebar_stats = st.container()
 
 # --- HAUPTBEREICH ---
-st.header(":material/agriculture: Schaderreger-Diagnostik Prototyp")
-st.markdown("*Bundesforschungsinstitut für Kulturpflanzen - Intelligentes Monitoring*")
-
-st.divider()
+st.header(":material/agriculture: Schaderreger-Diagnostik")
+st.markdown("*KI-gestütztes Monitoring für den Pflanzenschutz*")
 
 files = st.file_uploader(
-    "Bilder zur Analyse hochladen (Einzel- oder Batch-Modus)", 
+    "Bilder hochladen", 
     type=["jpg", "jpeg", "png"], 
-    accept_multiple_files=True,
-    help="Ziehen Sie mehrere Bilder hierher, um eine Batch-Verarbeitung zu starten."
+    accept_multiple_files=True
 )
 
 if files:
     all_results_data = []
-    
-    # Fortschrittsanzeige
-    progress_text = "KI-Modell analysiert Bilddaten..."
-    my_bar = st.progress(0, text=progress_text)
+    my_bar = st.progress(0)
 
-    st.subheader(f":material/view_module: Analyse-Ergebnisse ({len(files)} Bilder)")
-
-    # Raster-Layout: 2 Bilder pro Zeile
+    # Anzeige-Raster
     img_cols = st.columns(2)
     
     for i, file in enumerate(files):
-        my_bar.progress((i + 1) / len(files), text=f"Verarbeite: {file.name}")
+        my_bar.progress((i + 1) / len(files), text=f"Analysiere: {file.name}")
 
         image = Image.open(file)
+        # Inferenz
         results = model.predict(image, conf=conf_threshold)
-        res_plotted = results[0].plot(line_width=2, font_size=1.5)
+        
+        # FIX: Plotten mit explizit gesetzten Labels
+        # Wir erzwingen hier die Nutzung der übersetzten Namen
+        res_plotted = results[0].plot(line_width=3, font_size=2.0, labels=True)
         
         detections = results[0].boxes.cls.tolist()
         current_image_counts = {}
@@ -150,64 +129,37 @@ if files:
             current_image_counts[name] = current_image_counts.get(name, 0) + 1
 
         with img_cols[i % 2]:
-            st.markdown(f'<div class="image-container">', unsafe_allow_html=True)
-            st.image(res_plotted, caption=f"Identifikation: {file.name}", use_container_width=True)
+            st.markdown('<div class="image-container">', unsafe_allow_html=True)
+            st.image(res_plotted, caption=f"Ergebnis: {file.name}", use_container_width=True)
             
             if current_image_counts:
-                found_items = [f"**{count}x** {label}" for label, count in current_image_counts.items()]
-                st.markdown(f"🔍 {' · '.join(found_items)}")
+                labels = [f"**{count}x** {label}" for label, count in current_image_counts.items()]
+                st.markdown(f"✅ {' · '.join(labels)}")
             else:
-                st.caption("Keine signifikanten Funde auf diesem Bild.")
+                st.caption("Keine Schädlinge erkannt.")
             st.markdown('</div>', unsafe_allow_html=True)
 
     my_bar.empty()
 
-    # --- TABELLARISCHE AUSWERTUNG ---
     if all_results_data:
         st.divider()
-        st.subheader(":material/analytics: Zusammenfassung der Befunde")
         df = pd.DataFrame(all_results_data)
-        summary_df = df.groupby(['Fund']).size().reset_index(name='Anzahl Gesamt')
+        summary = df.groupby(['Fund']).size().reset_index(name='Anzahl')
         
-        col_table, col_download = st.columns([3, 1])
-        with col_table:
-            st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        c1, c2 = st.columns([3, 1])
+        c1.dataframe(summary, use_container_width=True, hide_index=True)
         
-        with col_download:
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Bericht herunterladen (CSV)",
-                data=csv,
-                file_name='jki_analyse_bericht.csv',
-                mime='text/csv',
-                use_container_width=True
-            )
+        csv = df.to_csv(index=False).encode('utf-8')
+        c2.download_button("📥 CSV Export", csv, "jki_report.csv", "text/csv")
 
         with sidebar_stats:
-            for _, row in summary_df.iterrows():
-                st.metric(label=row['Fund'], value=int(row['Anzahl Gesamt']))
-            st.success(f"Gesamt: {len(df)} Detektionen")
+            for _, row in summary.iterrows():
+                st.metric(label=row['Fund'], value=int(row['Anzahl']))
+            st.success(f"Gesamt: {len(df)} Funde")
 
 else:
-    # Willkommens-Screen ohne Hero-Bild
-    st.markdown("""
-        <div style="background-color: #e6f0eb; padding: 40px; border-radius: 15px; border-left: 5px solid #005432; margin-top: 20px;">
-            <h2 style="margin-top:0;">🚀 Startbereit</h2>
-            <p>Bitte laden Sie ein oder mehrere Fotos hoch, um die KI-gestützte Analyse zu starten. Das System identifiziert automatisch:</p>
-            <ul style="columns: 2;">
-                <li>Schaderreger & Insekten</li>
-                <li>Larvenstadien & Eier</li>
-                <li>Pflanzenkrankheiten</li>
-                <li>Nützlinge</li>
-            </ul>
-            <p><small>Tipp: Sie können auch einen ganzen Ordner mit Bildern markieren und hierher ziehen.</small></p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.info("Bitte laden Sie Bilder hoch, um die Analyse zu starten.")
 
 # --- FOOTER ---
 st.markdown("---")
-col_f1, col_f2 = st.columns(2)
-with col_f1:
-    st.caption("© 2026 Julius Kühn-Institut (JKI) | v1.4 Batch AI Core")
-with col_f2:
-    st.markdown("<div style='text-align: right;'><small>:material/check_circle: System-Status: Online | KI: YOLOv8</small></div>", unsafe_allow_html=True)
+st.markdown("<center><small>© 2026 JKI | Prototyp v1.5 | Status: Bereit</small></center>", unsafe_allow_html=True)
