@@ -15,8 +15,8 @@ st.set_page_config(
 st.markdown("""
     <style>
     .main { background-color: #f9fbf9; }
-    .stMetric { background-color: #ffffff; border: 1px solid #e1e4e8; padding: 15px; border-radius: 10px; }
-    div[data-testid="stExpander"] { border: none !important; box-shadow: none !important; }
+    [data-testid="stSidebar"] { background-color: #f0f4f0; }
+    .stMetric { background-color: #ffffff; border: 1px solid #e1e4e8; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,72 +58,66 @@ def load_model():
 
 model = load_model()
 
-# Sidebar
+# --- SIDEBAR ---
 with st.sidebar:
-    st.header("Analyse-Optionen")
-    conf_threshold = st.slider("KI-Konfidenz (Schwellenwert)", 0.0, 1.0, 0.25, 0.05, 
-                               help="Bestimmt, ab welcher Wahrscheinlichkeit ein Objekt als erkannt gilt.")
+    st.image("https://www.julius-kuehn.de/fileadmin/templates/jki/img/jki_logo.png", width=120)
+    st.header("Analyse & Befunde")
+    
+    conf_threshold = st.slider("KI-Konfidenz", 0.0, 1.0, 0.25, 0.05, 
+                               help="Schwellenwert für die Erkennungssicherheit.")
+    
     st.divider()
-    st.markdown("### Über dieses Projekt")
-    st.write("Entwickelt für das Monitoring invasiver Schädlinge und die automatisierte Felderfassung.")
+    
+    # Platzhalter für Befunde in der Sidebar
+    sidebar_results_placeholder = st.container()
 
-# Hauptbereich
+# --- HAUPTBEREICH ---
 st.title("🌱 JKI Prototyp: Crop & Weed Detector")
-st.markdown("#### Computer-Vision-gestützte Diagnostik für den modernen Pflanzenschutz")
-st.divider()
+st.markdown("#### KI-gestützte Schaderreger-Diagnostik")
 
-uploaded_file = st.file_uploader("Bild zur Analyse hochladen (JPG, PNG)...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Pflanzenfoto zur Analyse hochladen...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    with st.spinner('Bildanalyse läuft...'):
+    with st.spinner('Bild wird analysiert...'):
         image = Image.open(uploaded_file)
         
         # Inferenz
         results = model.predict(image, conf=conf_threshold)
         res_plotted = results[0].plot()
         
-        # Anzeige
+        # Anzeige der Bilder im Hauptbereich
         col1, col2 = st.columns(2)
         with col1:
             st.image(image, caption="Originalaufnahme", use_container_width=True)
         with col2:
             st.image(res_plotted, caption="Visualisierte Erkennung", use_container_width=True)
 
-        st.divider()
-        
-        # Ergebnisse
-        st.subheader("Befundbericht")
-        
+        # Daten für die Sidebar aufbereiten
         detections = results[0].boxes.cls.tolist()
         names = model.names
+        found_any = False
         
-        found_data = []
-        metric_cols = st.columns(4)
-        m_idx = 0
-        
-        for idx, name in names.items():
-            count = detections.count(idx)
-            if count > 0:
-                name_de = DEUTSCHE_NAMEN.get(name, name)
-                with metric_cols[m_idx % 4]:
+        with sidebar_results_placeholder:
+            st.subheader("Aktuelle Befunde")
+            for idx, name in names.items():
+                count = detections.count(idx)
+                if count > 0:
+                    found_any = True
+                    name_de = DEUTSCHE_NAMEN.get(name, name)
+                    # Kompakte Anzeige in der Sidebar
                     st.metric(label=name_de, value=int(count))
-                m_idx += 1
-                found_data.append({"Klasse": name_de, "Anzahl": int(count)})
-
-        if found_data:
-            with st.expander("Tabellarische Detailansicht"):
-                df = pd.DataFrame(found_data)
-                st.dataframe(df, use_container_width=True, hide_index=True)
-        else:
-            st.warning(f"Keine Objekte über dem Schwellenwert von {conf_threshold} erkannt.")
+            
+            if not found_any:
+                st.warning("Keine Schädlinge erkannt.")
+            else:
+                st.success(f"{len(detections)} Objekte identifiziert.")
 
 else:
-    # Willkommensansicht ohne den fehlerhaften alpha-Parameter
     st.info("Bitte laden Sie ein Foto hoch, um die Analyse zu starten.")
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Corn_field_in_summer_Germany.jpg/1200px-Corn_field_in_summer_Germany.jpg", 
-             caption="Beispielhafte Feldaufnahme für das KI-Monitoring", 
+             caption="Überwachung landwirtschaftlicher Kulturen", 
              use_container_width=True)
 
 # Footer
 st.markdown("---")
-st.caption("Forschungsprototyp | Julius Kühn-Institut (JKI) Bewerbungsprojekt")
+st.caption("Prototyp für das Julius Kühn-Institut (JKI) | Monitoring-System v1.2")
