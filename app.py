@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- ERWEITERTES BRANDING & CSS ---
+# --- BRANDING & CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -70,11 +70,9 @@ model = load_model()
 # --- SIDEBAR ---
 with st.sidebar:
     st.markdown("## 🔍 Agroscan AI")
-    st.caption("v2.2 Enterprise Edition")
+    st.caption("v2.3 Enterprise Edition")
     st.divider()
     conf_threshold = st.slider("KI-Konfidenz (Sensitivität)", 0.0, 1.0, 0.25, 0.05)
-    # Neu: IoU Slider um Überlappungen besser zu handhaben
-    iou_threshold = st.slider("Überlappungs-Toleranz (IoU)", 0.0, 1.0, 0.45, 0.05)
     st.divider()
     sidebar_stats = st.container()
 
@@ -82,7 +80,7 @@ with st.sidebar:
 st.markdown(f"""
     <div class="main-header">
         <h1>🌿 JKI Agroscan AI Dashboard</h1>
-        <p>Präzisions-Monitoring: Batch-Verarbeitung mit optimierter Objekttrennung</p>
+        <p>Batch-Diagnostik für den integrierten Pflanzenschutz</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -97,54 +95,42 @@ with tab1:
         cols = st.columns(3)
         
         for i, file in enumerate(files):
-            # Bild laden
+            # 1. Bild laden (Original-Format)
             file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
             img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
             
-            # KI Inferenz mit Fix für Mehrfach-Markierungen:
-            # iou=iou_threshold erlaubt eng beieinander liegende Boxen
-            # agnostic_nms=True verhindert, dass verschiedene Klassen sich gegenseitig löschen
-            results = model.predict(
-                img_bgr, 
-                conf=conf_threshold, 
-                iou=iou_threshold, 
-                agnostic_nms=True
-            )
+            # 2. Inferenz (Wir nutzen wieder die Basis-Parameter)
+            results = model.predict(img_bgr, conf=conf_threshold)
             
-            # Plotten mit etwas dünneren Linien für kleine Objekte (Blattläuse)
-            res_bgr = results[0].plot(line_width=1, font_size=0.8, labels=True)
+            # 3. Plotten (Standard-Plotting von YOLO für maximale Erkennbarkeit)
+            res_bgr = results[0].plot(line_width=2, labels=True)
             res_rgb = cv2.cvtColor(res_bgr, cv2.COLOR_BGR2RGB)
             
-            # Statistik
-            if results[0].boxes:
-                detections = results[0].boxes.cls.tolist()
-                counts = {}
-                for cls_id in detections:
-                    name = model.names[int(cls_id)]
-                    all_results_data.append({"Bild": file.name, "Fund": name, "Zeit": datetime.now().strftime("%H:%M:%S")})
-                    counts[name] = counts.get(name, 0) + 1
+            # Statistik-Erfassung
+            detections = results[0].boxes.cls.tolist()
+            counts = {}
+            for cls_id in detections:
+                name = model.names[int(cls_id)]
+                all_results_data.append({"Bild": file.name, "Fund": name, "Zeit": datetime.now().strftime("%H:%M:%S")})
+                counts[name] = counts.get(name, 0) + 1
 
-                with cols[i % 3]:
-                    st.markdown('<div class="res-card">', unsafe_allow_html=True)
-                    st.image(res_rgb, use_container_width=True)
-                    st.caption(f"📄 {file.name}")
+            with cols[i % 3]:
+                st.markdown('<div class="res-card">', unsafe_allow_html=True)
+                st.image(res_rgb, use_container_width=True)
+                st.caption(f"📄 {file.name}")
+                if counts:
                     for label, count in counts.items():
                         st.markdown(f"**{count}x** :green[{label}]")
-                    st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                with cols[i % 3]:
-                    st.markdown('<div class="res-card">', unsafe_allow_html=True)
-                    st.image(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB), use_container_width=True)
-                    st.caption(f"📄 {file.name}")
-                    st.markdown(":gray[Keine Schädlinge gefunden]")
-                    st.markdown('</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(":gray[Keine Befunde]")
+                st.markdown('</div>', unsafe_allow_html=True)
             
             progress_bar.progress((i + 1) / len(files))
         
         progress_bar.empty()
         st.session_state['analysis_data'] = all_results_data
     else:
-        st.info("Bereit für Upload. Bitte Bilder auswählen.")
+        st.info("Bitte laden Sie Bilder hoch, um die Analyse zu starten.")
 
 with tab2:
     if 'analysis_data' in st.session_state and st.session_state['analysis_data']:
@@ -153,17 +139,22 @@ with tab2:
         
         col_chart, col_data = st.columns([2, 1])
         with col_chart:
+            st.subheader("Befundverteilung")
             fig = px.bar(summary, x='Fund', y='Anzahl', color='Anzahl', color_continuous_scale='Greens')
             st.plotly_chart(fig, use_container_width=True)
+            
         with col_data:
+            st.subheader("Export")
             csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Report herunterladen", csv, "jki_report.csv", "text/csv", use_container_width=True)
+            st.download_button("📥 CSV Export", csv, "jki_report.csv", "text/csv", use_container_width=True)
+            
             for _, row in summary.iterrows():
                 st.metric(label=row['Fund'], value=int(row['Anzahl']))
+                
         with sidebar_stats:
             st.metric("Gesamtbefunde", len(df))
     else:
-        st.warning("Noch keine Daten vorhanden.")
+        st.warning("Noch keine Analysedaten verfügbar.")
 
 st.markdown("---")
-st.markdown("<center><small>© 2026 JKI | Prototyp v2.2 | Fix: Multi-Object-Detection</small></center>", unsafe_allow_html=True)
+st.markdown("<center><small>© 2026 JKI | Prototyp v2.3 | Reset: Stable Detection Logic</small></center>", unsafe_allow_html=True)
