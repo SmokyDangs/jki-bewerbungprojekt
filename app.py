@@ -55,13 +55,14 @@ DEUTSCHE_NAMEN = {
 @st.cache_resource
 def load_model():
     model = YOLO("best.pt")
-    # Hier passiert die Magie: Wir übersetzen die internen Klassennamen des Modells
-    # So nutzt .plot() automatisch die deutschen Begriffe
-    translated_names = {}
-    for idx, eng_name in model.names.items():
-        translated_names[idx] = DEUTSCHE_NAMEN.get(eng_name, eng_name)
     
-    model.names = translated_names
+    # Fehlerbehebung: Wir überschreiben die Werte im existierenden Dictionary,
+    # anstatt model.names = translated_names zu setzen.
+    if hasattr(model, 'names'):
+        for idx, eng_name in model.names.items():
+            if eng_name in DEUTSCHE_NAMEN:
+                model.names[idx] = DEUTSCHE_NAMEN[eng_name]
+                
     return model
 
 model = load_model()
@@ -77,7 +78,7 @@ with st.sidebar:
     st.divider()
     
     # Platzhalter für Befunde in der Sidebar
-    sidebar_results_placeholder = st.container()
+    sidebar_results_placeholder = st.empty()
 
 # --- HAUPTBEREICH ---
 st.title("🌱 JKI Prototyp: Crop & Weed Detector")
@@ -89,7 +90,7 @@ if uploaded_file:
     with st.spinner('Bild wird analysiert...'):
         image = Image.open(uploaded_file)
         
-        # Inferenz (nutzt jetzt die übersetzten Namen für das Plotten)
+        # Inferenz
         results = model.predict(image, conf=conf_threshold)
         res_plotted = results[0].plot()
         
@@ -102,19 +103,16 @@ if uploaded_file:
 
         # Daten für die Sidebar aufbereiten
         detections = results[0].boxes.cls.tolist()
-        names = model.names # Dies sind bereits die übersetzten Namen
         found_any = False
         
-        with sidebar_results_placeholder:
+        with sidebar_results_placeholder.container():
             st.subheader("Aktuelle Befunde")
-            # Wir iterieren über die detektierten Klassen-Indizes
-            unique_detections = set(detections)
+            unique_detections = sorted(list(set(detections)))
             
             for idx in unique_detections:
                 found_any = True
                 count = detections.count(idx)
-                name_de = names[idx]
-                # Kompakte Anzeige in der Sidebar
+                name_de = model.names[idx]
                 st.metric(label=name_de, value=int(count))
             
             if not found_any:
