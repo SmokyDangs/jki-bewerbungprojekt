@@ -17,6 +17,7 @@ st.markdown("""
     .main { background-color: #f9fbf9; }
     [data-testid="stSidebar"] { background-color: #f0f4f0; }
     .stMetric { background-color: #ffffff; border: 1px solid #e1e4e8; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
+    .stExpander { background-color: #ffffff; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -55,14 +56,10 @@ DEUTSCHE_NAMEN = {
 @st.cache_resource
 def load_model():
     model = YOLO("best.pt")
-    
-    # Fehlerbehebung: Wir überschreiben die Werte im existierenden Dictionary,
-    # anstatt model.names = translated_names zu setzen.
     if hasattr(model, 'names'):
         for idx, eng_name in model.names.items():
             if eng_name in DEUTSCHE_NAMEN:
                 model.names[idx] = DEUTSCHE_NAMEN[eng_name]
-                
     return model
 
 model = load_model()
@@ -70,62 +67,85 @@ model = load_model()
 # --- SIDEBAR ---
 with st.sidebar:
     st.image("https://www.julius-kuehn.de/fileadmin/templates/jki/img/jki_logo.png", width=120)
-    st.header("Analyse & Befunde")
+    st.header("Analyse-Optionen")
     
     conf_threshold = st.slider("KI-Konfidenz", 0.0, 1.0, 0.25, 0.05, 
                                help="Schwellenwert für die Erkennungssicherheit.")
     
     st.divider()
-    
-    # Platzhalter für Befunde in der Sidebar
-    sidebar_results_placeholder = st.empty()
+    st.subheader("Gesamtbefund (Batch)")
+    sidebar_batch_placeholder = st.empty()
 
 # --- HAUPTBEREICH ---
 st.title("🌱 JKI Prototyp: Crop & Weed Detector")
-st.markdown("#### KI-gestützte Schaderreger-Diagnostik")
+st.markdown("#### KI-gestützte Schaderreger-Diagnostik (Einzel- & Batchverarbeitung)")
 
-uploaded_file = st.file_uploader("Pflanzenfoto zur Analyse hochladen...", type=["jpg", "jpeg", "png"])
+uploaded_files = st.file_uploader(
+    "Pflanzenfotos hochladen (einzeln oder mehrere)...", 
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True
+)
 
-if uploaded_file:
-    with st.spinner('Bild wird analysiert...'):
-        image = Image.open(uploaded_file)
+if uploaded_files:
+    all_detections = []
+    
+    # Fortschrittsbalken für Batch
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    # Ergebnisse anzeigen
+    st.subheader(f"Verarbeitung von {len(uploaded_files)} Bild(ern)")
+    
+    for i, file in enumerate(uploaded_files):
+        # Fortschritt aktualisieren
+        progress = (i + 1) / len(uploaded_files)
+        progress_bar.progress(progress)
+        status_text.text(f"Analysiere Bild {i+1} von {len(uploaded_files)}: {file.name}")
+        
+        image = Image.open(file)
         
         # Inferenz
         results = model.predict(image, conf=conf_threshold)
         res_plotted = results[0].plot()
         
-        # Anzeige der Bilder im Hauptbereich
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(image, caption="Originalaufnahme", use_container_width=True)
-        with col2:
-            st.image(res_plotted, caption="Visualisierte Erkennung (Deutsch)", use_container_width=True)
-
-        # Daten für die Sidebar aufbereiten
-        detections = results[0].boxes.cls.tolist()
-        found_any = False
-        
-        with sidebar_results_placeholder.container():
-            st.subheader("Aktuelle Befunde")
-            unique_detections = sorted(list(set(detections)))
+        # Jedes Bild in einem Expander anzeigen, um Platz zu sparen
+        with st.expander(f"Ergebnis: {file.name}", expanded=(len(uploaded_files) == 1)):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.image(image, caption="Original", use_container_width=True)
+            with col2:
+                st.image(res_plotted, caption="Detektion (Deutsch)", use_container_width=True)
             
-            for idx in unique_detections:
-                found_any = True
-                count = detections.count(idx)
-                name_de = model.names[idx]
-                st.metric(label=name_de, value=int(count))
+            # Einzelbefunde pro Bild
+            current_detections = results[0].boxes.cls.tolist()
+            all_detections.extend(current_detections)
             
-            if not found_any:
-                st.warning("Keine Schädlinge erkannt.")
+            if current_detections:
+                found_names = [model.names[int(cls)] for cls in current_detections]
+                st.write(f"**Gefunden:** {', '.join(set(found_names))} ({len(current_detections)} Objekte)")
             else:
-                st.success(f"{len(detections)} Objekte identifiziert.")
+                st.write("Keine Schädlinge gefunden.")
+
+    # Status aufräumen
+    status_text.success(f"Analyse von {len(uploaded_files)} Bildern abgeschlossen.")
+    
+    # --- BATCH-AUSWERTUNG IN DER SIDEBAR ---
+    with sidebar_batch_placeholder.container():
+        if all_detections:
+            unique_ids = sorted(list(set(all_detections)))
+            for idx in unique_ids:
+                total_count = all_detections.count(idx)
+                st.metric(label=model.names[idx], value=int(total_count))
+            st.info(f"Gesamtanzahl Funde: {len(all_detections)}")
+        else:
+            st.warning("Keine Befunde im Batch.")
 
 else:
-    st.info("Bitte laden Sie ein Foto hoch, um die Analyse zu starten.")
+    st.info("Bitte laden Sie ein oder mehrere Fotos hoch.")
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Corn_field_in_summer_Germany.jpg/1200px-Corn_field_in_summer_Germany.jpg", 
              caption="Überwachung landwirtschaftlicher Kulturen", 
              use_container_width=True)
 
 # Footer
 st.markdown("---")
-st.caption("Prototyp für das Julius Kühn-Institut (JKI) | Monitoring-System v1.2")
+st.caption("Prototyp für das Julius Kühn-Institut (JKI) | Monitoring-System v1.3 - Batch-Mode")
