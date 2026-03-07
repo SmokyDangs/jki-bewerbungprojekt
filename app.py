@@ -2,7 +2,8 @@ import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
 import pandas as pd
-import io
+import numpy as np
+import cv2
 
 # --- KONFIGURATION ---
 st.set_page_config(
@@ -22,17 +23,15 @@ st.markdown("""
     .image-container {
         border: 1px solid #e2e8f0;
         border-radius: 12px;
-        padding: 15px;
+        padding: 10px;
         background-color: white;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     
-    .stButton>button {
-        background-color: #005432;
-        color: white;
+    /* Fix für Bildabstände */
+    .stImage > img {
         border-radius: 8px;
-        width: 100%;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -71,7 +70,6 @@ DEUTSCHE_NAMEN = {
 @st.cache_resource
 def load_model():
     model = YOLO("best.pt")
-    # Mapping auf das interne Modell-Dictionary anwenden
     if hasattr(model, 'names'):
         for idx, eng_name in model.names.items():
             if eng_name in DEUTSCHE_NAMEN:
@@ -84,41 +82,35 @@ model = load_model()
 with st.sidebar:
     st.markdown("## 🌿 JKI Agroscan")
     st.divider()
-    st.subheader("🛠️ Einstellungen")
-    
     conf_threshold = st.slider("KI-Konfidenz (Sensitivität)", 0.0, 1.0, 0.25, 0.05)
-    
     st.divider()
-    st.markdown("### 📊 Live-Statistik")
     sidebar_stats = st.container()
 
 # --- HAUPTBEREICH ---
 st.header(":material/agriculture: Schaderreger-Diagnostik")
 st.markdown("*KI-gestütztes Monitoring für den Pflanzenschutz*")
 
-files = st.file_uploader(
-    "Bilder hochladen", 
-    type=["jpg", "jpeg", "png"], 
-    accept_multiple_files=True
-)
+files = st.file_uploader("Bilder hochladen", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
 if files:
     all_results_data = []
     my_bar = st.progress(0)
-
-    # Anzeige-Raster
     img_cols = st.columns(2)
     
     for i, file in enumerate(files):
         my_bar.progress((i + 1) / len(files), text=f"Analysiere: {file.name}")
 
-        image = Image.open(file)
-        # Inferenz
-        results = model.predict(image, conf=conf_threshold)
+        # Bild laden und in RGB sicherstellen
+        original_image = Image.open(file).convert("RGB")
+        img_array = np.array(original_image)
         
-        # FIX: Plotten mit explizit gesetzten Labels
-        # Wir erzwingen hier die Nutzung der übersetzten Namen
-        res_plotted = results[0].plot(line_width=3, font_size=2.0, labels=True)
+        # Inferenz
+        results = model.predict(img_array, conf=conf_threshold)
+        
+        # Plotten: Wir holen uns das geplottete Bild als BGR-Array (YOLO-Standard)
+        # und konvertieren es zurück nach RGB für Streamlit
+        res_bgr = results[0].plot(line_width=2, font_size=1.2, labels=True)
+        res_rgb = cv2.cvtColor(res_bgr, cv2.COLOR_BGR2RGB)
         
         detections = results[0].boxes.cls.tolist()
         current_image_counts = {}
@@ -130,7 +122,8 @@ if files:
 
         with img_cols[i % 2]:
             st.markdown('<div class="image-container">', unsafe_allow_html=True)
-            st.image(res_plotted, caption=f"Ergebnis: {file.name}", use_container_width=True)
+            # Output-Format explizit auf RGB setzen
+            st.image(res_rgb, caption=f"Ergebnis: {file.name}", use_container_width=True, channels="RGB")
             
             if current_image_counts:
                 labels = [f"**{count}x** {label}" for label, count in current_image_counts.items()]
@@ -145,10 +138,8 @@ if files:
         st.divider()
         df = pd.DataFrame(all_results_data)
         summary = df.groupby(['Fund']).size().reset_index(name='Anzahl')
-        
         c1, c2 = st.columns([3, 1])
         c1.dataframe(summary, use_container_width=True, hide_index=True)
-        
         csv = df.to_csv(index=False).encode('utf-8')
         c2.download_button("📥 CSV Export", csv, "jki_report.csv", "text/csv")
 
@@ -156,10 +147,8 @@ if files:
             for _, row in summary.iterrows():
                 st.metric(label=row['Fund'], value=int(row['Anzahl']))
             st.success(f"Gesamt: {len(df)} Funde")
-
 else:
     st.info("Bitte laden Sie Bilder hoch, um die Analyse zu starten.")
 
-# --- FOOTER ---
 st.markdown("---")
-st.markdown("<center><small>© 2026 JKI | Prototyp v1.5 | Status: Bereit</small></center>", unsafe_allow_html=True)
+st.markdown("<center><small>© 2026 JKI | Prototyp v1.6 | Fix: RGB-Resolution</small></center>", unsafe_allow_html=True)
