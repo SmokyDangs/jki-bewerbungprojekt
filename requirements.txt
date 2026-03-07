@@ -1,5 +1,7 @@
-streamlit
 ultralytics
+streamlit
+pandas
+numpy
 opencv-python-headless
+plotly
 pillow
-git+https://github.com/openai/CLIP.git
