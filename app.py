@@ -11,11 +11,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS für JKI-Look (Dezentes Grün)
+# Custom CSS für JKI-Branding
 st.markdown("""
     <style>
     .main { background-color: #f9fbf9; }
     .stMetric { background-color: #ffffff; border: 1px solid #e1e4e8; padding: 15px; border-radius: 10px; }
+    div[data-testid="stExpander"] { border: none !important; box-shadow: none !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -57,51 +58,46 @@ def load_model():
 
 model = load_model()
 
-# Sidebar für Experten-Einstellungen
+# Sidebar
 with st.sidebar:
-    st.image("https://www.julius-kuehn.de/fileadmin/templates/jki/img/jki_logo.png", width=150) # Platzhalter für JKI Logo
-    st.header("Analyse-Einstellungen")
-    conf_threshold = st.slider("KI-Konfidenz-Schwellenwert", 0.0, 1.0, 0.25, 0.05, 
+    st.header("Analyse-Optionen")
+    conf_threshold = st.slider("KI-Konfidenz (Schwellenwert)", 0.0, 1.0, 0.25, 0.05, 
                                help="Bestimmt, ab welcher Wahrscheinlichkeit ein Objekt als erkannt gilt.")
-    st.info("Dieses Tool dient zur automatisierten Früherkennung von Schädlingen in landwirtschaftlichen Kulturen.")
+    st.divider()
+    st.markdown("### Über dieses Projekt")
+    st.write("Entwickelt für das Monitoring invasiver Schädlinge und die automatisierte Felderfassung.")
 
 # Hauptbereich
 st.title("🌱 JKI Prototyp: Crop & Weed Detector")
-st.markdown("### Präzisionslandwirtschaft & Pflanzenschutz-Monitoring")
+st.markdown("#### Computer-Vision-gestützte Diagnostik für den modernen Pflanzenschutz")
 st.divider()
 
 uploaded_file = st.file_uploader("Bild zur Analyse hochladen (JPG, PNG)...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    # Ladeanzeige
-    with st.spinner('Bild wird verarbeitet...'):
+    with st.spinner('Bildanalyse läuft...'):
         image = Image.open(uploaded_file)
         
-        # Inferenz mit einstellbarem Schwellenwert
+        # Inferenz
         results = model.predict(image, conf=conf_threshold)
-        
-        # Ergebnisse visualisieren
         res_plotted = results[0].plot()
         
-        # Layout Spalten
-        col1, col2 = st.columns([1, 1])
+        # Anzeige
+        col1, col2 = st.columns(2)
         with col1:
             st.image(image, caption="Originalaufnahme", use_container_width=True)
         with col2:
-            st.image(res_plotted, caption="Visualisierte Erkennung (KI)", use_container_width=True)
+            st.image(res_plotted, caption="Visualisierte Erkennung", use_container_width=True)
 
         st.divider()
         
-        # Statistik & Auswertung
+        # Ergebnisse
         st.subheader("Befundbericht")
         
         detections = results[0].boxes.cls.tolist()
         names = model.names
         
-        # Daten für Tabelle und Metriken sammeln
         found_data = []
-        
-        # Metriken in Reihen anzeigen
         metric_cols = st.columns(4)
         m_idx = 0
         
@@ -109,27 +105,25 @@ if uploaded_file:
             count = detections.count(idx)
             if count > 0:
                 name_de = DEUTSCHE_NAMEN.get(name, name)
-                
-                # Metrik-Karten (max 4 pro Zeile)
                 with metric_cols[m_idx % 4]:
                     st.metric(label=name_de, value=int(count))
                 m_idx += 1
-                
-                found_data.append({"Schädling/Stadium": name_de, "Anzahl": int(count)})
+                found_data.append({"Klasse": name_de, "Anzahl": int(count)})
 
-        # Zusätzliche Details in Tabelle
         if found_data:
-            with st.expander("Detaillierte Tabellenansicht"):
+            with st.expander("Tabellarische Detailansicht"):
                 df = pd.DataFrame(found_data)
-                st.table(df)
+                st.dataframe(df, use_container_width=True, hide_index=True)
         else:
-            st.warning(f"Keine Objekte mit einer Konfidenz von > {conf_threshold*100}% gefunden. Versuchen Sie den Schwellenwert in der Sidebar zu senken.")
+            st.warning(f"Keine Objekte über dem Schwellenwert von {conf_threshold} erkannt.")
 
 else:
-    # Willkommensbildschirm / Platzhalter
-    st.info("Bitte laden Sie ein Foto hoch, um die KI-gestützte Analyse zu starten.")
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Corn_field_in_summer_Germany.jpg/1200px-Corn_field_in_summer_Germany.jpg", caption="Beispielhafte Feldaufnahme", use_container_width=True, alpha=0.3)
+    # Willkommensansicht ohne den fehlerhaften alpha-Parameter
+    st.info("Bitte laden Sie ein Foto hoch, um die Analyse zu starten.")
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Corn_field_in_summer_Germany.jpg/1200px-Corn_field_in_summer_Germany.jpg", 
+             caption="Beispielhafte Feldaufnahme für das KI-Monitoring", 
+             use_container_width=True)
 
 # Footer
 st.markdown("---")
-st.caption("Entwickelt als Prototyp für das Julius Kühn-Institut (JKI) | Fachbereich: Intelligente Pflanzenschutzsysteme")
+st.caption("Forschungsprototyp | Julius Kühn-Institut (JKI) Bewerbungsprojekt")
