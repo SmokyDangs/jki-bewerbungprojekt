@@ -28,11 +28,7 @@ st.markdown("""
         margin-bottom: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    
-    /* Fix für Bildabstände */
-    .stImage > img {
-        border-radius: 8px;
-    }
+    .stImage > img { border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -100,16 +96,18 @@ if files:
     for i, file in enumerate(files):
         my_bar.progress((i + 1) / len(files), text=f"Analysiere: {file.name}")
 
-        # Bild laden und in RGB sicherstellen
-        original_image = Image.open(file).convert("RGB")
-        img_array = np.array(original_image)
+        # 1. Bild laden und direkt in das von YOLO bevorzugte Format bringen
+        file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
+        img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         
-        # Inferenz
-        results = model.predict(img_array, conf=conf_threshold)
+        # 2. Inferenz (YOLO bekommt direkt das BGR-Array aus OpenCV)
+        results = model.predict(img_bgr, conf=conf_threshold)
         
-        # Plotten: Wir holen uns das geplottete Bild als BGR-Array (YOLO-Standard)
-        # und konvertieren es zurück nach RGB für Streamlit
+        # 3. Plotten (YOLO plottet auf das BGR-Bild)
+        # img_size sorgt dafür, dass die Boxen im GUI scharf gezeichnet werden
         res_bgr = results[0].plot(line_width=2, font_size=1.2, labels=True)
+        
+        # 4. Zurück nach RGB für die Streamlit-Anzeige
         res_rgb = cv2.cvtColor(res_bgr, cv2.COLOR_BGR2RGB)
         
         detections = results[0].boxes.cls.tolist()
@@ -122,8 +120,7 @@ if files:
 
         with img_cols[i % 2]:
             st.markdown('<div class="image-container">', unsafe_allow_html=True)
-            # Output-Format explizit auf RGB setzen
-            st.image(res_rgb, caption=f"Ergebnis: {file.name}", use_container_width=True, channels="RGB")
+            st.image(res_rgb, caption=f"Ergebnis: {file.name}", use_container_width=True)
             
             if current_image_counts:
                 labels = [f"**{count}x** {label}" for label, count in current_image_counts.items()]
@@ -151,4 +148,4 @@ else:
     st.info("Bitte laden Sie Bilder hoch, um die Analyse zu starten.")
 
 st.markdown("---")
-st.markdown("<center><small>© 2026 JKI | Prototyp v1.6 | Fix: RGB-Resolution</small></center>", unsafe_allow_html=True)
+st.markdown("<center><small>© 2026 JKI | Prototyp v1.7 | Optimierte Modell-Übergabe</small></center>", unsafe_allow_html=True)
