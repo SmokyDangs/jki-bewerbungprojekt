@@ -21,7 +21,7 @@
 | Feature | Beschreibung |
 | :--- | :--- |
 | **🚀 Batch-Analyse** | Gleichzeitige Verarbeitung hunderter Bilddaten zur Feld-Diagnostik. |
-| **🔬 Präzise Klassifizierung** | Erkennung von >25 Arten (Blattläuse, Kohlmotten, Wanzen) inkl. Larvenstadien. |
+| **🔬 Präzise Klassifizierung** | Erkennung von 12 Arten (Blattläuse, Kohlmotten, Wanzen) inkl. Larvenstadien. |
 | **🔍 Live-Monitoring** | Sofortige Visualisierung mit dynamischen Confidence-Filtern. |
 | **📊 Enterprise Analytics** | Interaktive Plotly-Dashboards zur statistischen Befallsauswertung. |
 | **📥 Export-System** | Generierung wissenschaftlicher CSV-Reports für die Dokumentation. |
