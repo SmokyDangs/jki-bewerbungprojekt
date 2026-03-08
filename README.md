@@ -1,50 +1,57 @@
-🌿 JKI Agroscan AI | Enterprise Edition
-KI-basierte Batch-Diagnostik für den integrierten Pflanzenschutz
-JKI Agroscan AI ist ein hochspezialisiertes Analyse-Tool zur automatisierten Identifikation von Schädlingen und Krankheitserregern an Kulturpflanzen. Entwickelt als Prototyp (v2.5) für den Einsatz in der landwirtschaftlichen Diagnostik, kombiniert es modernste Computer Vision (YOLO) mit einer intuitiven Benutzeroberfläche für Batch-Analysen.
+# <p align="center">🌿 JKI Agroscan AI | Enterprise Edition</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-2.5_Enterprise-007d4a?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Framework-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit">
+  <img src="https://img.shields.io/badge/AI-YOLOv8/v10-00FFFF?style=for-the-badge" alt="YOLO">
+</p>
 
-📋 Kernfunktionen
-Automatisierte Batch-Analyse: Gleichzeitige Verarbeitung mehrerer Bilddateien zur effizienten Feld-Diagnostik.
+---
 
-Präzise Klassifizierung: Erkennung von über 25 spezifischen Schädlingen (Blattläuse, Kohlmotten, Wanzen, Larvenstadien etc.) mit deutscher Nomenklatur.
+## 📖 Projekt-Übersicht
+**JKI Agroscan AI** ist ein hochspezialisiertes Analyse-Tool zur automatisierten Identifikation von Schädlingen und Krankheitserregern an Kulturpflanzen. Entwickelt als **Prototyp (v2.5)** für den Einsatz in der landwirtschaftlichen Diagnostik am **Julius Kühn-Institut**, kombiniert es modernste **Computer Vision (YOLO)** mit einer intuitiven Batch-Processing-Oberfläche.
 
-Interaktives Monitoring: Visualisierung der Befunde direkt im Bild mit dynamischen Confidence-Schwellenwerten.
+> [!IMPORTANT]
+> Diese App ist für den **integrierten Pflanzenschutz** optimiert und unterstützt Wissenschaftler dabei, Befallsdichten in Echtzeit zu quantifizieren.
 
-Enterprise Analytics: Integriertes Dashboard mit Plotly-Charts zur statistischen Auswertung der Befallsdichte.
+---
 
-Export-Funktion: Generierung von CSV-Reports für die weiterführende wissenschaftliche Dokumentation.
+## 📋 Kernfunktionen
 
-🔬 Wissenschaftlicher Kontext
-Das System unterstützt die Ziele des integrierten Pflanzenschutzes durch:
+| Feature | Beschreibung |
+| :--- | :--- |
+| **🚀 Batch-Analyse** | Gleichzeitige Verarbeitung hunderter Bilddaten zur Feld-Diagnostik. |
+| **🔬 Präzise Klassifizierung** | Erkennung von >25 Arten (Blattläuse, Kohlmotten, Wanzen) inkl. Larvenstadien. |
+| **🔍 Live-Monitoring** | Sofortige Visualisierung mit dynamischen Confidence-Filtern. |
+| **📊 Enterprise Analytics** | Interaktive Plotly-Dashboards zur statistischen Befallsauswertung. |
+| **📥 Export-System** | Generierung wissenschaftlicher CSV-Reports für die Dokumentation. |
 
-Früherkennung: Identifikation von Schädlingen bereits in frühen Entwicklungsstadien (Eier, Nymphen, Larven).
+---
 
-Monitoring: Präzise Erfassung der Befallsfrequenz zur Optimierung von Pflanzenschutzmaßnahmen.
+## 🔬 Wissenschaftlicher Kontext & Impact
 
-Dokumentation: Revisionssichere Archivierung von Diagnose-Daten.
+Das System transformiert die klassische Schädlingsbestimmung in einen digitalen Workflow:
 
-🛠️ Tech-Stack
-Inferenz: Ultralytics YOLO (State-of-the-Art Object Detection).
+* **Früherkennung:** Identifikation kleinster Merkmale (Eier, Nymphen) zur Prävention.
+* **Monitoring:** Objektive Erfassung der Frequenz zur Optimierung von Pflanzenschutzmitteln.
+* **Dokumentation:** Revisionssichere Archivierung digitaler Befunde.
 
-Frontend: Streamlit (Adaptive UI für Light/Dark Mode).
 
-Datenanalyse: Pandas & Plotly Express.
 
-Bildverarbeitung: OpenCV & NumPy.
+---
 
-📦 Lokales Setup (Linux Mint / Debian)
-Repository klonen:
+## 🛠️ Tech-Stack & Architektur
 
-Bash
-git clone https://github.com/SmokyDangs/jki-bewerbungprojekt.git
+* **Core AI:** `ultralytics` YOLO (Inferenz-Optimiert).
+* **UI/UX:** `streamlit` mit Adaptive Design (Light/Dark Mode Support).
+* **Data Science:** `pandas`, `plotly-express`.
+* **Vision:** `opencv-python-headless` & `NumPy`.
+
+---
+
+## 📦 Lokales Setup (Linux Mint / Debian)
+
+### 1. Repository klonen
+```bash
+git clone [https://github.com/SmokyDangs/jki-bewerbungprojekt.git](https://github.com/SmokyDangs/jki-bewerbungprojekt.git)
 cd jki-bewerbungprojekt
-Abhängigkeiten installieren:
-Hinweis: Nutzt die Headless-Version von OpenCV für Server-Kompatibilität.
-
-Bash
-pip install -r requirements.txt
-Anwendung starten:
-
-Bash
-streamlit run app.py
-📂 Struktur & Datenmapping
-Die Anwendung nutzt ein Mapping-System, um internationale wissenschaftliche Bezeichnungen in gebräuchliche deutsche Namen zu übersetzen (z.B. Plagiodera versicolora → Weidenblattkäfer). Dies erhöht die Usability für Anwender im deutschsprachigen Raum erheblich.
