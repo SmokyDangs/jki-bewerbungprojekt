@@ -68,3 +68,5 @@ Für das Training und die Validierung der KI wurde der folgende spezialisierte D
 ```bash
 git clone [https://github.com/SmokyDangs/jki-bewerbungprojekt.git](https://github.com/SmokyDangs/jki-bewerbungprojekt.git)
 cd jki-bewerbungprojekt
+pip install -r requirements.txt
+streamlit run app.py
