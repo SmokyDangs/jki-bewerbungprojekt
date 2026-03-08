@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Version-2.5_Enterprise-007d4a?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/AI-YOLOv8/v10-00FFFF?style=flat-square" alt="YOLO">
-  <img src="https://img.shields.io/badge/Status-In_Produktion-success?style=flat-square" alt="Status">
+  <img src="https://img.shields.io/badge/Data-Roboflow-6706ce?style=flat-square&logo=roboflow" alt="Roboflow">
 </p>
 
 ---
@@ -35,15 +35,21 @@
 
 ---
 
-## 🔬 Wissenschaftlicher Kontext & Impact
+## 🔬 Wissenschaftlicher Kontext & Modell-Training
 
-Das System transformiert die klassische Schädlingsbestimmung in einen digitalen Hochgeschwindigkeits-Workflow:
+Das System transformiert die klassische Schädlingsbestimmung in einen digitalen Hochgeschwindigkeits-Workflow. Das Fine-Tuning des YOLO-Modells basiert auf qualitativ hochwertigen agrarwissenschaftlichen Daten.
 
-* **Früherkennung:** Identifikation kleinster Merkmale (Eier, Nymphen) zur Prävention massiver Ernteausfälle.
+### 📊 Datensatz & Training
+Für das Training und die Validierung der KI wurde der folgende spezialisierte Datensatz verwendet:
+* **Dataset:** [Pest-Uruhn auf Roboflow Universe](https://universe.roboflow.com/dense-pset/pest-uruhn)
+* **Inhalt:** Annotierte Bilddaten von Schädlingen in verschiedenen Entwicklungsstadien (Eier, Nymphen, Larven, Adult).
+
+
+
+### Impact:
+* **Früherkennung:** Identifikation kleinster Merkmale zur Prävention massiver Ernteausfälle.
 * **Monitoring:** Objektive Erfassung der Befallsfrequenz zur präzisen Steuerung von Pflanzenschutzmaßnahmen.
 * **Dokumentation:** Automatisierte Erstellung digitaler Befund-Protokolle für die Agrarforschung.
-
-
 
 ---
 
