@@ -17,8 +17,8 @@ def load_model(model_path):
         return None
 
 def main():
-    st.title("🚀 YOLO12 Objekt-Erkennung")
-    st.write("Lade ein Bild hoch, um Objekte mit dem neuesten YOLO12 Modell zu erkennen.")
+    st.title("Schädlingserkennung")
+    st.write("Lade ein Bild hoch, um Schädlinge zu erkennen und zu makieren.")
 
     # Sidebar für Einstellungen
     st.sidebar.header("Konfiguration")
