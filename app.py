@@ -1,11 +1,13 @@
-from ultralytics import solutions
+import cv2
+from ultralytics.solutions.streamlit_inference import Inference
 
-# Initialisierung der fertigen Ultralytics-Streamlit-Lösung
-# model: Pfad zu deiner 'best.pt'
-inf = solutions.Inference(model="best.pt")
+def main():
+    # Übergabe deines spezifischen Modells 'best.pt'
+    # Die Inference-Klasse lädt dieses Modell automatisch in das Streamlit-UI
+    inf = Inference(model="best.pt")
 
-# Startet die Weboberfläche
-inf.inference()
+    # Startet die Weboberfläche und die Logik für Bilder, Videos oder Webcam
+    inf.inference()
 
-# WICHTIG: Starte diese Datei über das Terminal mit:
-# streamlit run app.py
+if __name__ == "__main__":
+    main()
