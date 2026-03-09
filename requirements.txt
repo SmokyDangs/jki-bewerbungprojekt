@@ -1,5 +1,5 @@
-streamlit==1.55.0
-ultralytics==8.4.21
+streamlit
+ultralytics
 pillow
 pandas
 numpy
