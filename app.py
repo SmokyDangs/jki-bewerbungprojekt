@@ -24,7 +24,7 @@ def main():
     st.sidebar.header("Konfiguration")
     model_type = st.sidebar.selectbox(
         "Wähle das Modell-Gewicht",
-        ["yolov12n.pt", "yolov12s.pt", "yolov12m.pt"]
+        ["best.pt"]
     )
     conf_threshold = st.sidebar.slider("Confidence Threshold", 0.0, 1.0, 0.25)
 
