@@ -1,6 +1,2 @@
 streamlit
 ultralytics
-pillow
-pandas
-numpy
-plotly
